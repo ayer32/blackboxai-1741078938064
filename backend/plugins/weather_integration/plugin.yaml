@@ -1,0 +1,26 @@
+name: weather_integration
+version: "1.0.0"
+description: "Weather integration plugin for Krish AI Assistant"
+author: "Krish AI Team"
+dependencies:
+  - "requests"
+  - "aiohttp"
+permissions:
+  - "network_access"
+  - "location_access"
+config_schema:
+  api_key:
+    type: string
+    description: "OpenWeatherMap API key"
+    required: true
+  units:
+    type: string
+    description: "Temperature units (metric/imperial)"
+    default: "metric"
+    enum: ["metric", "imperial"]
+  cache_duration:
+    type: integer
+    description: "Cache duration in minutes"
+    default: 30
+    minimum: 5
+    maximum: 120
