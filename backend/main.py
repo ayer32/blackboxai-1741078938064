@@ -1,3 +1,4 @@
+=======
 [Previous imports...]
 from rbac_manager import (
     RBACManager,
@@ -7,6 +8,8 @@ from rbac_manager import (
     get_current_active_user,
     require_permission
 )
+from face_verification import FaceVerificationSystem
+=======
 
 # Initialize components
 [Previous initializations...]
@@ -14,8 +17,17 @@ rbac_manager = RBACManager(
     mongodb_url=os.getenv("MONGODB_URL", "mongodb://localhost:27017"),
     jwt_secret=os.getenv("JWT_SECRET", "your-secret-key")
 )
+face_verification = FaceVerificationSystem()
 
 # Additional Models
+class FaceRegistrationRequest(BaseModel):
+    image_data: str
+    user_id: str
+
+class FaceVerificationRequest(BaseModel):
+    image_data: str
+    user_id: str
+
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -136,14 +148,82 @@ async def speech_to_text(
     """Convert speech to text with RBAC"""
     [Previous implementation...]
 
+@app.post("/api/face/register")
+@require_permission(Permission.USE_FACE)
+async def register_face(
+    request: FaceRegistrationRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Register a new face for biometric authentication"""
+    try:
+        # Validate user has permission to register face for the given user_id
+        if current_user.id != request.user_id and not current_user.has_permission(Permission.MANAGE_USERS):
+            raise HTTPException(
+                status_code=403,
+                detail="Not authorized to register face for other users"
+            )
+
+        result = face_verification.register_face(
+            image_data=request.image_data,
+            user_id=request.user_id
+        )
+
+        if not result["success"]:
+            raise HTTPException(
+                status_code=400,
+                detail=result["error"]
+            )
+
+        return {
+            "status": "success",
+            "message": result["message"]
+        }
+
+    except Exception as e:
+        logger.error(f"Face registration failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Face registration failed: {str(e)}"
+        )
+
 @app.post("/api/face/verify")
 @require_permission(Permission.USE_FACE)
 async def verify_face(
-    request: dict = Body(...),
+    request: FaceVerificationRequest,
     current_user: User = Depends(get_current_active_user)
 ):
-    """Verify face with RBAC"""
-    [Previous implementation...]
+    """Verify face for biometric authentication"""
+    try:
+        # Validate user has permission to verify face for the given user_id
+        if current_user.id != request.user_id and not current_user.has_permission(Permission.MANAGE_USERS):
+            raise HTTPException(
+                status_code=403,
+                detail="Not authorized to verify face for other users"
+            )
+
+        result = face_verification.verify_face(
+            image_data=request.image_data,
+            user_id=request.user_id
+        )
+
+        if not result["success"]:
+            raise HTTPException(
+                status_code=401,
+                detail=result["error"]
+            )
+
+        return {
+            "status": "success",
+            "message": result["message"],
+            "confidence": result.get("confidence", 1.0)
+        }
+
+    except Exception as e:
+        logger.error(f"Face verification failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Face verification failed: {str(e)}"
+        )
 
 @app.post("/api/process-command")
 @require_permission(Permission.USE_AI)
