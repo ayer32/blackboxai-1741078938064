@@ -1,0 +1,58 @@
+name: daily_routine
+description: "Automate daily morning routine"
+trigger:
+  type: schedule
+  time: "07:00"
+  timezone: "UTC"
+
+steps:
+  - name: check_weather
+    service: openweathermap
+    action: get_weather
+    params:
+      city: "${city}"
+      units: metric
+    output: weather_data
+
+  - name: create_calendar_summary
+    service: google
+    action: create_calendar_event
+    params:
+      summary: "Daily Planning"
+      start_time: "${today}T09:00:00"
+      end_time: "${today}T09:30:00"
+      description: "Weather: ${weather_data.description}\nTemp: ${weather_data.temp}°C"
+
+  - name: start_music
+    service: spotify
+    action: play_playlist
+    params:
+      playlist: "Morning Motivation"
+
+  - name: smart_home_morning
+    service: ifttt
+    action: trigger_scene
+    params:
+      event: morning_routine
+      value1: "on"
+      value2: "20"  # temperature
+      value3: "bright"  # lighting
+
+  - name: send_summary_email
+    service: google
+    action: send_email
+    params:
+      to: "${email}"
+      subject: "Your Morning Summary"
+      body: |
+        Good morning!
+        
+        Here's your daily summary:
+        
+        Weather: ${weather_data.description}
+        Temperature: ${weather_data.temp}°C
+        
+        Today's Schedule:
+        ${calendar_events}
+        
+        Have a great day!
